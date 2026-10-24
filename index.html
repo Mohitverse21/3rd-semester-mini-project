@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="description" content="Face recognition student attendance dashboard" />
+    <title>Attendly · Face Attendance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="#overview" aria-label="Attendly home">
+          <span class="brand-mark" aria-hidden="true">A</span>
+          <span>attendly<span class="brand-period">.</span></span>
+        </a>
+        <div class="nav-caption">WORKSPACE</div>
+        <nav class="side-nav">
+          <a class="nav-link active" href="#overview"><span class="nav-icon">▦</span>Overview</a>
+          <a class="nav-link" href="#cameras"><span class="nav-icon">◎</span>Face attendance</a>
+          <a class="nav-link" href="#students"><span class="nav-icon">♙</span>Students</a>
+          <a class="nav-link" href="#activity"><span class="nav-icon">◷</span>Attendance log</a>
+        </nav>
+        <div class="sidebar-bottom">
+          <span class="live-dot"></span>
+          <div><strong>Local system</strong><small>Camera-based check-in</small></div>
+        </div>
+      </aside>
+
+      <main class="main-content" id="overview">
+        <header class="topbar">
+          <div class="mobile-brand"><span class="brand-mark">A</span> attendly<span class="brand-period">.</span></div>
+          <div class="breadcrumb">Workspace <span>/</span> Overview</div>
+          <div class="topbar-actions">
+            <span class="date-chip" id="currentDate">Loading date…</span>
+            <button id="refreshBtn" class="icon-button" type="button" aria-label="Refresh dashboard" title="Refresh dashboard">↻</button>
+            <span class="avatar" aria-label="Administrator">A</span>
+          </div>
+        </header>
+
+        <section class="page-heading">
+          <div>
+            <p class="eyebrow">ATTENDANCE MANAGEMENT</p>
+            <h1>Good day, Administrator <span class="wave">✦</span></h1>
+            <p class="page-subtitle">A clear view of your class attendance and daily activity.</p>
+          </div>
+          <a class="heading-link" href="#cameras">Go to face check-in <span aria-hidden="true">↗</span></a>
+        </section>
+
+        <section class="summary-grid" id="systemSummary" aria-label="Attendance summary" aria-live="polite">
+          <div class="summary-placeholder">Loading attendance summary…</div>
+        </section>
+
+        <section class="panel attendance-panel" id="cameras">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">QUICK ACTIONS</p>
+              <h2>Face attendance</h2>
+              <p class="section-subtitle">Register a student or record today’s attendance using the webcam.</p>
+            </div>
+            <span class="model-tag"><span id="cameraIndicatorDot" class="live-dot"></span><span id="cameraIndicatorText">Starting camera…</span></span>
+          </div>
+            <div class="subject-toolbar">
+              <label class="subject-picker" for="subjectSelect">
+                Attendance subject
+                <select id="subjectSelect" aria-label="Select attendance subject"></select>
+              </label>
+              <div class="subject-manage">
+                <button id="manageSubjectsBtn" class="button button-secondary" type="button">+ Add subject</button>
+                <div id="subjectAddForm" class="subject-add-form" hidden>
+                  <label class="visually-hidden" for="subjectName">New subject name</label>
+                  <input id="subjectName" type="text" placeholder="Subject name" maxlength="60" />
+                  <button id="addSubjectBtn" class="button button-primary" type="button">Save subject</button>
+                </div>
+              </div>
+              <p id="subjectStatus" class="subject-status" role="status" aria-live="polite"></p>
+            </div>
+            <div class="camera-grid">
+            <article class="camera-card">
+              <div class="camera-title">
+                <div><span class="step-number">01</span><h3>Register a student</h3></div>
+                <span class="camera-hint">One-time setup</span>
+              </div>
+              <div class="camera-wrap">
+                <video id="registerVideo" autoplay playsinline muted aria-label="Registration camera preview"></video>
+                <div class="camera-overlay"><span class="camera-dot"></span> CAMERA PREVIEW</div>
+              </div>
+              <div class="field-grid">
+                <label for="studentName">Student name<input type="text" id="studentName" placeholder="e.g. Riya Sharma" autocomplete="name" maxlength="80" /></label>
+                <label for="studentRoll">Roll number<input type="text" id="studentRoll" placeholder="e.g. CS-101" maxlength="40" /></label>
+              </div>
+              <div class="button-row">
+                <button id="captureRegisterBtn" class="button button-secondary" type="button">Capture face</button>
+                <button id="registerBtn" class="button button-primary" type="button">Register student <span aria-hidden="true">→</span></button>
+              </div>
+              <div id="registerStatus" class="status-box" role="status" aria-live="polite">Allow camera access to begin.</div>
+            </article>
+
+            <article class="camera-card">
+              <div class="camera-title">
+                <div><span class="step-number">02</span><h3>Mark attendance</h3></div>
+                <span class="camera-hint">Once per student / subject / day</span>
+              </div>
+              <div class="camera-wrap">
+                <video id="attendanceVideo" autoplay playsinline muted aria-label="Attendance camera preview"></video>
+                <div class="camera-overlay"><span class="camera-dot"></span> CAMERA PREVIEW</div>
+              </div>
+              <div class="attendance-tip"><span aria-hidden="true">✦</span> Face the camera in good light and keep your face centered.</div>
+              <div class="button-row attendance-buttons">
+                <button id="captureAttendanceBtn" class="button button-primary" type="button">Capture &amp; mark present <span aria-hidden="true">→</span></button>
+                <button id="toggleCameraBtn" class="button button-secondary" type="button">Turn camera off</button>
+              </div>
+              <div id="attendanceStatus" class="status-box" role="status" aria-live="polite">Attendance is recorded with the current date and time.</div>
+            </article>
+          </div>
+        </section>
+
+        <div class="content-grid">
+          <section class="panel" id="students">
+            <div class="section-heading compact-heading">
+              <div><p class="eyebrow">CLASS ROSTER</p><h2>Students</h2></div>
+              <span class="count-chip" id="studentCount">— students</span>
+            </div>
+            <div id="studentList" class="student-list" aria-live="polite"><div class="empty-state">Loading students…</div></div>
+            <p class="panel-footnote">Present and absent totals are shown for the selected subject on dates with recorded attendance.</p>
+          </section>
+
+          <section class="panel" id="activity">
+            <div class="section-heading compact-heading">
+              <div><p class="eyebrow">LATEST CHECK-INS</p><h2>Attendance activity</h2></div>
+              <span class="count-chip">Recent</span>
+            </div>
+            <label class="search-field" for="attendanceSearch"><span aria-hidden="true">⌕</span><input id="attendanceSearch" type="search" placeholder="Search name or roll number" autocomplete="off" /></label>
+            <div id="attendanceList" class="attendance-list" aria-live="polite"><div class="empty-state">Loading attendance activity…</div></div>
+            <p class="panel-footnote">Showing up to 20 latest attendance records.</p>
+          </section>
+        </div>
+
+        <footer class="app-footer">
+          <span>Attendly · Face Recognition Attendance</span>
+          <span>Built for a single-classroom attendance workflow</span>
+        </footer>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
