@@ -1,5 +1,7 @@
 # Attendly — Face Recognition Attendance
 
+[View the GitHub repository](https://github.com/Mohitverse21/3rd-semester-mini-project)
+
 Attendly is a local, browser-based attendance dashboard for a classroom. It uses a webcam to enroll students and mark attendance by face, with records organized by subject and stored in a local SQLite database.
 
 > **Project status:** Educational/miniproject prototype. Face recognition is probabilistic and should not be used as the sole basis for consequential attendance decisions.
@@ -60,6 +62,17 @@ Open **http://127.0.0.1:5000** in your browser and allow camera access when prom
 
 On first start, the application initializes its SQLite database and face-sample directory. If the Haar Cascade file is missing, the backend attempts to download it and then falls back to the copy included with OpenCV.
 
+## Deploy a public demo on Railway
+
+The app is not designed for real student data on a public URL: it has no authentication, and face images and attendance records are sensitive. Use this deployment only with test data.
+
+1. Push this repository to GitHub, then create a Railway project from the GitHub repository and deploy its `main` branch. Railway detects the root `Dockerfile`.
+2. Add a Railway volume to the service and set its mount path to `/data`. The app stores its SQLite database, face samples, and recognition model in `ATTENDLY_DATA_DIR` (`/data` in the container).
+3. Configure the service health check to use `/health`, then generate a public domain in Railway's networking settings.
+4. Open the generated HTTPS URL, allow camera access, and use test identities only.
+
+The container listens on Railway's injected `PORT`. The Railway domain and project must be created in your account; this repository does not contain a fabricated deployment URL. Without a mounted volume, local files may be lost when Railway replaces the container.
+
 ## Using the dashboard
 
 1. Choose the attendance subject, or create one with **Add subject**.
@@ -82,6 +95,7 @@ The frontend and API are served by the same Flask application.
 | `GET` | `/api/attendance?subject_id=<id>` | Get recent attendance records |
 | `POST` | `/api/attendance/mark` | Match a captured face and record attendance |
 | `GET` | `/api/system?subject_id=<id>` | Get dashboard summary statistics |
+| `GET` | `/health` | Check whether the app is ready |
 
 JSON request bodies are used for `POST` requests. Image data is sent as a base64 data URL by the browser.
 
@@ -92,6 +106,7 @@ JSON request bodies are used for `POST` requests. Image data is sent as a base64
 ├── backend/
 │   ├── app.py              # Flask app, API, database, and face recognition
 │   └── requirements.txt    # Python dependencies
+├── Dockerfile              # Railway container build and production server
 ├── app.js                  # Dashboard behavior and API requests
 ├── index.html              # Dashboard markup
 ├── styles.css              # Dashboard styles

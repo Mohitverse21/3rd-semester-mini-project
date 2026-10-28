@@ -209,6 +209,7 @@ h1 {
 }
 .wave { color: var(--accent); font-size: 20px; vertical-align: 2px; }
 .page-subtitle, .section-subtitle { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+.demo-notice { color: var(--amber); font-size: 11px; margin: 9px 0 0; }
 .heading-link { color: var(--accent); font-size: 12px; font-weight: 700; padding-bottom: 2px; white-space: nowrap; }
 .heading-link span { font-size: 15px; margin-left: 5px; }
 
@@ -442,6 +443,8 @@ h1 {
 .search-field input:focus { box-shadow: none; }
 
 .app-footer { color: #58635d; display: flex; font-size: 10px; justify-content: space-between; gap: 12px; padding: 19px 2px 0; }
+.source-link { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.source-link:hover { color: #a0edc7; }
 
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 

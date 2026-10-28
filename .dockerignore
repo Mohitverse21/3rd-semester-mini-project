@@ -1,0 +1,9 @@
+.git
+.venv
+.venv310
+__pycache__
+*.py[cod]
+*.db
+backend/faces
+backend/lbph_model.xml
+backend/haarcascade_frontalface_default.xml

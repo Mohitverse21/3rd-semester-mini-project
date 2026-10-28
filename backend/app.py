@@ -1,4 +1,5 @@
 import base64
+import os
 import re
 import sqlite3
 import uuid
@@ -11,9 +12,10 @@ from flask import Flask, jsonify, request, send_from_directory
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent
-DB_PATH = BACKEND_DIR / 'attendance.db'
-FACES_DIR = BACKEND_DIR / 'faces'
-MODEL_PATH = BACKEND_DIR / 'lbph_model.xml'
+DATA_DIR = Path(os.environ.get('ATTENDLY_DATA_DIR', BACKEND_DIR)).expanduser().resolve()
+DB_PATH = DATA_DIR / 'attendance.db'
+FACES_DIR = DATA_DIR / 'faces'
+MODEL_PATH = DATA_DIR / 'lbph_model.xml'
 CASCADE_PATH = BACKEND_DIR / 'haarcascade_frontalface_default.xml'
 FACE_MATCH_THRESHOLD = 80.0
 
@@ -52,7 +54,8 @@ def get_db_connection():
 
 
 def init_db():
-    FACES_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    FACES_DIR.mkdir(parents=True, exist_ok=True)
     conn = get_db_connection()
     conn.execute(
         '''
@@ -333,6 +336,11 @@ def frontend_styles():
     return send_from_directory(str(BASE_DIR), 'styles.css')
 
 
+@app.route('/health')
+def health():
+    return jsonify({'status': 'ok'})
+
+
 @app.route('/api/students', methods=['GET'])
 def list_students():
     try:
@@ -523,4 +531,4 @@ init_db()
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000)
+    app.run(host='127.0.0.1', port=int(os.environ.get('PORT', '5000')))
