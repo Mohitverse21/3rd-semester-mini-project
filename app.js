@@ -25,6 +25,10 @@ const attendanceButton = document.getElementById('captureAttendanceBtn');
 const cameraToggleButton = document.getElementById('toggleCameraBtn');
 const cameraIndicatorText = document.getElementById('cameraIndicatorText');
 const cameraIndicatorDot = document.getElementById('cameraIndicatorDot');
+const reportStartDate = document.getElementById('reportStartDate');
+const reportEndDate = document.getElementById('reportEndDate');
+const attendanceTrend = document.getElementById('attendanceTrend');
+const reportStatus = document.getElementById('reportStatus');
 
 function setStatus(element, message, kind = 'info') {
   element.textContent = message;
@@ -155,6 +159,162 @@ function renderSummary(summary) {
   }));
 }
 
+function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function setDefaultReportDates() {
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  reportStartDate.value = formatLocalDate(weekAgo);
+  reportEndDate.value = formatLocalDate(today);
+}
+
+function getReportQuery() {
+  if (state.activeSubjectId === null) {
+    throw new Error('Select a subject before requesting a report.');
+  }
+  const start = reportStartDate.value;
+  const end = reportEndDate.value;
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+  if (!isoDate.test(start) || !isoDate.test(end)) {
+    throw new Error('Choose both a start date and an end date.');
+  }
+  const startTime = Date.parse(`${start}T00:00:00Z`);
+  const endTime = Date.parse(`${end}T00:00:00Z`);
+  if (Number.isNaN(startTime) || Number.isNaN(endTime)
+      || new Date(startTime).toISOString().slice(0, 10) !== start
+      || new Date(endTime).toISOString().slice(0, 10) !== end) {
+    throw new Error('Choose valid dates for the report.');
+  }
+  if (startTime > endTime) {
+    throw new Error('The start date must be on or before the end date.');
+  }
+  if ((endTime - startTime) / 86400000 >= 366) {
+    throw new Error('Choose a date range of 366 days or fewer.');
+  }
+  return new URLSearchParams({
+    subject_id: String(state.activeSubjectId),
+    start_date: start,
+    end_date: end,
+  });
+}
+
+function renderReport(report) {
+  document.getElementById('reportAverage').textContent = report.average_attendance_rate === null
+    ? '—'
+    : `${report.average_attendance_rate}%`;
+  document.getElementById('reportActiveDays').textContent = String(report.active_days);
+  document.getElementById('reportCheckIns').textContent = String(report.total_check_ins);
+
+  const days = report.daily.map((day) => {
+    const item = makeElement('div', 'trend-day');
+    item.setAttribute('role', 'listitem');
+    const hasSession = day.has_session === true;
+    const dateParts = day.date.split('-').map(Number);
+    const dateLabel = new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+    }).format(new Date(dateParts[0], dateParts[1] - 1, dateParts[2]));
+    const countLabel = hasSession
+      ? `${day.present_count}/${day.total_students}`
+      : '—';
+    item.setAttribute(
+      'aria-label',
+      hasSession
+        ? `${dateLabel}: ${day.present_count} of ${day.total_students} students present`
+        : `${dateLabel}: no session recorded`,
+    );
+    item.append(makeElement('span', 'trend-count', countLabel));
+
+    const track = makeElement('span', 'trend-track');
+    track.setAttribute('aria-hidden', 'true');
+    if (hasSession && day.attendance_rate !== null) {
+      const bar = makeElement('span', 'trend-bar');
+      bar.style.height = `${Math.max(3, Math.min(100, day.attendance_rate))}%`;
+      track.append(bar);
+    } else {
+      track.append(makeElement('span', 'trend-no-session', '—'));
+    }
+    item.append(track, makeElement('span', 'trend-label', dateLabel));
+    return item;
+  });
+  attendanceTrend.replaceChildren(...days);
+  reportStatus.className = 'report-status';
+  reportStatus.textContent = report.active_days
+    ? `${report.active_days} recorded ${report.active_days === 1 ? 'session' : 'sessions'} in this range. Days without a recorded session are not counted as absences.`
+    : 'No attendance sessions were recorded in this date range.';
+}
+
+function showReportError(message) {
+  document.getElementById('reportAverage').textContent = '—';
+  document.getElementById('reportActiveDays').textContent = '—';
+  document.getElementById('reportCheckIns').textContent = '—';
+  attendanceTrend.replaceChildren(makeElement('div', 'empty-state error-text', message));
+  reportStatus.className = 'report-status error-text';
+  reportStatus.textContent = message;
+}
+
+async function loadReport() {
+  const refreshButton = document.getElementById('refreshReportBtn');
+  setBusy(refreshButton, true, 'Updating…');
+  reportStatus.className = 'report-status';
+  reportStatus.textContent = 'Loading attendance report…';
+  try {
+    const query = getReportQuery();
+    const report = await apiRequest(`/api/reports?${query}`);
+    if (!Array.isArray(report.daily)) {
+      throw new Error('The server returned an invalid attendance report.');
+    }
+    renderReport(report);
+    return true;
+  } catch (error) {
+    showReportError(error.message);
+    return false;
+  } finally {
+    setBusy(refreshButton, false);
+  }
+}
+
+async function exportAttendanceReport() {
+  const exportButton = document.getElementById('exportReportBtn');
+  setBusy(exportButton, true, 'Preparing…');
+  try {
+    const query = getReportQuery();
+    let response;
+    try {
+      response = await fetch(`/api/attendance/export?${query}`);
+    } catch {
+      throw new Error('Cannot reach the attendance server. Check that the backend is running.');
+    }
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || `Export failed (${response.status}).`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const downloadLink = makeElement('a');
+    downloadLink.href = url;
+    downloadLink.download = `attendly-attendance-${state.activeSubjectId}-${reportStartDate.value}-${reportEndDate.value}.csv`;
+    document.body.append(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    reportStatus.className = 'report-status';
+    reportStatus.textContent = 'Attendance report downloaded as CSV.';
+  } catch (error) {
+    reportStatus.className = 'report-status error-text';
+    reportStatus.textContent = error.message;
+  } finally {
+    setBusy(exportButton, false);
+  }
+}
+
 async function loadDashboard() {
   const refreshButton = document.getElementById('refreshBtn');
   refreshButton.classList.add('is-loading');
@@ -195,6 +355,7 @@ async function loadDashboard() {
     renderStudents();
     renderAttendance();
     renderSummary(summary);
+    await loadReport();
     return true;
   } catch (error) {
     systemSummary.replaceChildren(makeElement('div', 'dashboard-error', error.message));
@@ -360,6 +521,8 @@ registerButton.addEventListener('click', registerStudent);
 attendanceButton.addEventListener('click', markAttendance);
 document.getElementById('attendanceSearch').addEventListener('input', renderAttendance);
 document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+document.getElementById('refreshReportBtn').addEventListener('click', loadReport);
+document.getElementById('exportReportBtn').addEventListener('click', exportAttendanceReport);
 cameraToggleButton.addEventListener('click', async () => {
   if (state.cameraStream) stopCamera();
   else await startCamera();
@@ -416,6 +579,7 @@ document.getElementById('currentDate').textContent = new Intl.DateTimeFormat(und
   year: 'numeric',
 }).format(new Date());
 
+setDefaultReportDates();
 loadDashboard();
 startCamera();
 

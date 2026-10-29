@@ -1,14 +1,16 @@
+import csv
 import base64
+import io
 import os
 import re
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import cv2
 import numpy as np
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -18,6 +20,7 @@ FACES_DIR = DATA_DIR / 'faces'
 MODEL_PATH = DATA_DIR / 'lbph_model.xml'
 CASCADE_PATH = BACKEND_DIR / 'haarcascade_frontalface_default.xml'
 FACE_MATCH_THRESHOLD = 80.0
+MAX_REPORT_RANGE_DAYS = 366
 
 
 def ensure_cascade_file():
@@ -234,6 +237,96 @@ def get_attendance_records(subject_id):
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def parse_report_date_range(start_value, end_value):
+    if not start_value and not end_value:
+        end_date = date.today()
+        start_date = end_date - timedelta(days=6)
+        return start_date, end_date
+    if not start_value or not end_value:
+        raise ValueError('Choose both a start date and an end date.')
+
+    try:
+        start_date = date.fromisoformat(start_value)
+        end_date = date.fromisoformat(end_value)
+    except (TypeError, ValueError):
+        raise ValueError('Dates must use the YYYY-MM-DD format.')
+
+    if start_date.isoformat() != start_value or end_date.isoformat() != end_value:
+        raise ValueError('Dates must use the YYYY-MM-DD format.')
+    if start_date > end_date:
+        raise ValueError('The start date must be on or before the end date.')
+    if (end_date - start_date).days >= MAX_REPORT_RANGE_DAYS:
+        raise ValueError(f'Date ranges must be no longer than {MAX_REPORT_RANGE_DAYS} days.')
+    return start_date, end_date
+
+
+def get_attendance_report(subject_id, start_date, end_date):
+    conn = get_db_connection()
+    total_students = conn.execute(
+        'SELECT COUNT(*) AS count FROM students WHERE date(created_at) <= ?',
+        (end_date.isoformat(),),
+    ).fetchone()['count']
+    rows = conn.execute(
+        '''
+        SELECT a.date, COUNT(DISTINCT a.student_id) AS present_count,
+               COUNT(*) AS check_ins,
+               (SELECT COUNT(*) FROM students s
+                WHERE date(s.created_at) <= a.date) AS total_students
+        FROM attendance a
+        WHERE a.subject_id = ? AND a.date BETWEEN ? AND ?
+        GROUP BY a.date
+        ORDER BY a.date ASC
+        ''',
+        (subject_id, start_date.isoformat(), end_date.isoformat()),
+    ).fetchall()
+    conn.close()
+
+    recorded_days = {row['date']: dict(row) for row in rows}
+    daily = []
+    current_date = start_date
+    while current_date <= end_date:
+        date_key = current_date.isoformat()
+        recorded = recorded_days.get(date_key)
+        present_count = recorded['present_count'] if recorded else 0
+        enrolled_count = recorded['total_students'] if recorded else 0
+        daily.append({
+            'date': date_key,
+            'present_count': present_count,
+            'total_students': enrolled_count,
+            'attendance_rate': (
+                round(present_count / enrolled_count * 100, 1)
+                if recorded and enrolled_count
+                else None
+            ),
+            'has_session': recorded is not None,
+        })
+        current_date += timedelta(days=1)
+
+    active_days = [day for day in daily if day['has_session']]
+    rated_days = [day for day in active_days if day['attendance_rate'] is not None]
+    average_rate = (
+        round(sum(day['attendance_rate'] for day in rated_days) / len(rated_days), 1)
+        if rated_days
+        else None
+    )
+    return {
+        'start_date': start_date.isoformat(),
+        'end_date': end_date.isoformat(),
+        'total_students': total_students,
+        'active_days': len(active_days),
+        'average_attendance_rate': average_rate,
+        'total_check_ins': sum(day['check_ins'] for day in recorded_days.values()),
+        'daily': daily,
+    }
+
+
+def csv_safe_cell(value):
+    text = str(value if value is not None else '')
+    if text.lstrip(' \t\r\n').startswith(('=', '+', '-', '@')):
+        return f"'{text}"
+    return text
 
 
 def get_students_with_count(subject_id):
@@ -498,6 +591,62 @@ def attendance_records():
         return jsonify({'error': str(exc)}), 400
 
 
+@app.route('/api/reports', methods=['GET'])
+def attendance_report():
+    try:
+        subject_id = parse_subject_id(request.args.get('subject_id'))
+        start_date, end_date = parse_report_date_range(
+            request.args.get('start_date'),
+            request.args.get('end_date'),
+        )
+        report = get_attendance_report(subject_id, start_date, end_date)
+        report['subject'] = get_subject(subject_id)['name']
+        return jsonify(report)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@app.route('/api/attendance/export', methods=['GET'])
+def export_attendance():
+    try:
+        subject_id = parse_subject_id(request.args.get('subject_id'))
+        start_date, end_date = parse_report_date_range(
+            request.args.get('start_date'),
+            request.args.get('end_date'),
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    conn = get_db_connection()
+    rows = conn.execute(
+        '''
+        SELECT s.name AS student_name, s.roll_number, sub.name AS subject,
+               a.date, a.time
+        FROM attendance a
+        JOIN students s ON s.id = a.student_id
+        JOIN subjects sub ON sub.id = a.subject_id
+        WHERE a.subject_id = ? AND a.date BETWEEN ? AND ?
+        ORDER BY a.date ASC, a.time ASC, s.name COLLATE NOCASE ASC
+        ''',
+        (subject_id, start_date.isoformat(), end_date.isoformat()),
+    ).fetchall()
+    conn.close()
+
+    output = io.StringIO(newline='')
+    writer = csv.writer(output)
+    writer.writerow(['Student name', 'Roll number', 'Subject', 'Date', 'Time'])
+    writer.writerows(
+        [csv_safe_cell(row[column]) for column in ('student_name', 'roll_number', 'subject', 'date', 'time')]
+        for row in rows
+    )
+    filename = f'attendly-attendance-{subject_id}-{start_date.isoformat()}-{end_date.isoformat()}.csv'
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+    )
+
+
 @app.route('/api/attendance/mark', methods=['POST'])
 def mark_attendance():
     payload = request.get_json(silent=True)
@@ -531,4 +680,7 @@ init_db()
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=int(os.environ.get('PORT', '5000')))
+    app.run(
+        host=os.environ.get('FLASK_HOST', '0.0.0.0'),
+        port=int(os.environ.get('PORT', '5000')),
+    )

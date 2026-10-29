@@ -22,6 +22,7 @@
         <nav class="side-nav">
           <a class="nav-link active" href="#overview"><span class="nav-icon">▦</span>Overview</a>
           <a class="nav-link" href="#cameras"><span class="nav-icon">◎</span>Face attendance</a>
+          <a class="nav-link" href="#insights"><span class="nav-icon">▤</span>Attendance trends</a>
           <a class="nav-link" href="#students"><span class="nav-icon">♙</span>Students</a>
           <a class="nav-link" href="#activity"><span class="nav-icon">◷</span>Attendance log</a>
         </nav>
@@ -54,6 +55,29 @@
 
         <section class="summary-grid" id="systemSummary" aria-label="Attendance summary" aria-live="polite">
           <div class="summary-placeholder">Loading attendance summary…</div>
+        </section>
+
+        <section class="panel insights-panel" id="insights">
+          <div class="section-heading insights-heading">
+            <div>
+              <p class="eyebrow">ATTENDANCE INTELLIGENCE</p>
+              <h2>Attendance trends</h2>
+              <p class="section-subtitle">Review recorded check-ins and export the selected subject’s report.</p>
+            </div>
+            <div class="report-metrics" aria-live="polite">
+              <div><span>Average on recorded days</span><strong id="reportAverage">—</strong></div>
+              <div><span>Recorded days</span><strong id="reportActiveDays">—</strong></div>
+              <div><span>Check-ins</span><strong id="reportCheckIns">—</strong></div>
+            </div>
+          </div>
+          <div class="report-toolbar">
+            <label class="report-date" for="reportStartDate">From<input id="reportStartDate" type="date" /></label>
+            <label class="report-date" for="reportEndDate">To<input id="reportEndDate" type="date" /></label>
+            <button id="refreshReportBtn" class="button button-secondary" type="button">Update report</button>
+            <button id="exportReportBtn" class="button button-primary" type="button">Download CSV</button>
+          </div>
+          <div id="attendanceTrend" class="trend-chart" role="list" aria-label="Daily attendance rate"></div>
+          <p id="reportStatus" class="report-status" role="status" aria-live="polite">Days without recorded attendance are shown as no session.</p>
         </section>
 
         <section class="panel attendance-panel" id="cameras">

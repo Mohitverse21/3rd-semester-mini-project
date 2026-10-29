@@ -13,6 +13,8 @@ Attendly is a local, browser-based attendance dashboard for a classroom. It uses
 - Face matching with OpenCV's LBPH recognizer
 - Subject creation and subject-specific attendance records
 - Student roster, daily summary, and recent attendance activity
+- Date-range attendance trends with recorded-session averages
+- Spreadsheet-safe CSV attendance exports
 - Searchable check-in log and dashboard refresh
 - Local SQLite persistence; no external database service
 - Responsive dashboard interface
@@ -32,7 +34,7 @@ Attendly is a local, browser-based attendance dashboard for a classroom. It uses
 - A modern browser with webcam support
 - A working webcam and permission to access it
 
-Camera access is generally restricted by browsers to secure contexts. `http://127.0.0.1:5000` and `http://localhost:5000` are supported local development origins.
+Camera access is restricted by browsers to secure contexts. Localhost is supported for local development; other devices generally need to use the app over HTTPS to access their camera.
 
 ## Run locally
 
@@ -58,20 +60,24 @@ python -m pip install -r backend/requirements.txt
 python backend/app.py
 ```
 
-Open **http://127.0.0.1:5000** in your browser and allow camera access when prompted. The Flask server binds to `127.0.0.1:5000` by default.
+Open **http://127.0.0.1:5000** on the computer running the app. The Flask development server listens on all network interfaces by default, so another device on the same Wi-Fi/LAN can open `http://<server-ip>:5000` (for example, `http://192.168.1.20:5000`). Find the server's local IPv4 address with `ipconfig` on Windows or `ip addr` on macOS/Linux, and allow inbound connections on port 5000 in the computer's firewall if prompted.
+
+The LAN address makes the dashboard reachable, but browsers generally block webcam access on plain HTTP LAN addresses. To use face enrollment or attendance from another device, deploy the app behind HTTPS (for example, follow the Railway instructions below). This prototype has no authentication, so any public deployment must use test data only.
 
 On first start, the application initializes its SQLite database and face-sample directory. If the Haar Cascade file is missing, the backend attempts to download it and then falls back to the copy included with OpenCV.
+
+Run the report tests from the project root with `python -m unittest discover -s tests -v`.
 
 ## Deploy a public demo on Railway
 
 The app is not designed for real student data on a public URL: it has no authentication, and face images and attendance records are sensitive. Use this deployment only with test data.
 
-1. Push this repository to GitHub, then create a Railway project from the GitHub repository and deploy its `main` branch. Railway detects the root `Dockerfile`.
+1. Push this repository, including `railway.json`, to GitHub. In Railway, create a project from this GitHub repository and deploy the `main` branch. Railway uses the root `Dockerfile` and the `railway.json` health-check configuration.
 2. Add a Railway volume to the service and set its mount path to `/data`. The app stores its SQLite database, face samples, and recognition model in `ATTENDLY_DATA_DIR` (`/data` in the container).
-3. Configure the service health check to use `/health`, then generate a public domain in Railway's networking settings.
-4. Open the generated HTTPS URL, allow camera access, and use test identities only.
+3. In the service's networking settings, generate a public domain. Railway provides an HTTPS URL that can be shared with other people.
+4. Open the generated URL, allow camera access, and use test identities only. The public app has no sign-in, so anyone with the URL can use it and view its attendance data.
 
-The container listens on Railway's injected `PORT`. The Railway domain and project must be created in your account; this repository does not contain a fabricated deployment URL. Without a mounted volume, local files may be lost when Railway replaces the container.
+The container listens on Railway's injected `PORT`. Creating the Railway project, volume, and public domain requires access to a Railway account; this repository cannot create or supply a deployment URL by itself. Without a mounted volume, local files may be lost when Railway replaces the container.
 
 ## Using the dashboard
 
@@ -79,8 +85,21 @@ The container listens on Railway's injected `PORT`. The Railway domain and proje
 2. In **Register a student**, enter the student's name and roll number, capture a face image, then register the student.
 3. In **Mark attendance**, capture the student's face. A successful match records the check-in for the selected subject and current date.
 4. Review the subject's student roster, summary, and latest check-ins. Use the attendance search field to filter recent activity.
+5. In **Attendance trends**, choose a date range to review attendance on recorded days, or download the selected subject's attendance as a CSV file. Unrecorded dates are shown as no session rather than assumed absences. Report ranges can include up to 366 days.
 
 Each student can be marked once per subject per day. Face matching depends on image quality, lighting, and camera position; ensure the student is correctly identified if a result is uncertain.
+
+## Ideas for the next release
+
+The reporting feature is a useful base for a more capable attendance platform. Consider adding these in order:
+
+1. **Authentication and roles:** require sign-in, protect student and attendance APIs, and separate administrator and instructor permissions before storing real student data.
+2. **Session scheduling and manual review:** define class meetings, let instructors correct a check-in, and keep an audit trail. Only calculate absences for scheduled sessions.
+3. **Privacy-first check-in options:** offer a QR code or instructor-confirmed fallback, consent and retention controls, and a way to remove biometric samples without losing attendance history.
+4. **Installable offline-friendly app:** add a PWA shell and queue only non-biometric attendance actions when offline, then sync safely when the server is available.
+5. **Production data and observability:** move from SQLite to PostgreSQL for multi-user deployments, add backups and migrations, and monitor health without logging face images or sensitive payloads.
+
+Treat facial recognition as an optional convenience, not proof of identity. Any automated match should be reviewable and have a non-biometric alternative.
 
 ## API overview
 
@@ -93,11 +112,14 @@ The frontend and API are served by the same Flask application.
 | `GET` | `/api/students?subject_id=<id>` | List students and attendance counts |
 | `POST` | `/api/students` | Enroll a student using a captured face image |
 | `GET` | `/api/attendance?subject_id=<id>` | Get recent attendance records |
+| `GET` | `/api/reports?subject_id=<id>&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` | Get daily attendance trends for a date range |
+| `GET` | `/api/attendance/export?subject_id=<id>&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` | Download an attendance CSV |
 | `POST` | `/api/attendance/mark` | Match a captured face and record attendance |
 | `GET` | `/api/system?subject_id=<id>` | Get dashboard summary statistics |
 | `GET` | `/health` | Check whether the app is ready |
 
 JSON request bodies are used for `POST` requests. Image data is sent as a base64 data URL by the browser.
+Report dates are inclusive, and ranges are limited to 366 days. Omitting both report dates returns the last seven calendar days.
 
 ## Project layout
 
@@ -107,6 +129,8 @@ JSON request bodies are used for `POST` requests. Image data is sent as a base64
 │   ├── app.py              # Flask app, API, database, and face recognition
 │   └── requirements.txt    # Python dependencies
 ├── Dockerfile              # Railway container build and production server
+├── tests/
+│   └── test_reports.py     # Report and CSV export tests
 ├── app.js                  # Dashboard behavior and API requests
 ├── index.html              # Dashboard markup
 ├── styles.css              # Dashboard styles
