@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: attendly
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ATTENDLY_DATA_DIR
+        value: /data

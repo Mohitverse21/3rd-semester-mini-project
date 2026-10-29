@@ -62,22 +62,21 @@ python backend/app.py
 
 Open **http://127.0.0.1:5000** on the computer running the app. The Flask development server listens on all network interfaces by default, so another device on the same Wi-Fi/LAN can open `http://<server-ip>:5000` (for example, `http://192.168.1.20:5000`). Find the server's local IPv4 address with `ipconfig` on Windows or `ip addr` on macOS/Linux, and allow inbound connections on port 5000 in the computer's firewall if prompted.
 
-The LAN address makes the dashboard reachable, but browsers generally block webcam access on plain HTTP LAN addresses. To use face enrollment or attendance from another device, deploy the app behind HTTPS (for example, follow the Railway instructions below). This prototype has no authentication, so any public deployment must use test data only.
+The LAN address makes the dashboard reachable, but browsers generally block webcam access on plain HTTP LAN addresses. To use face enrollment or attendance from another device, deploy the app behind HTTPS (for example, follow the Render instructions below). This prototype has no authentication, so any public deployment must use test data only.
 
 On first start, the application initializes its SQLite database and face-sample directory. If the Haar Cascade file is missing, the backend attempts to download it and then falls back to the copy included with OpenCV.
 
 Run the report tests from the project root with `python -m unittest discover -s tests -v`.
 
-## Deploy a public demo on Railway
+## Deploy a public demo on Render
 
 The app is not designed for real student data on a public URL: it has no authentication, and face images and attendance records are sensitive. Use this deployment only with test data.
 
-1. Push this repository, including `railway.json`, to GitHub. In Railway, create a project from this GitHub repository and deploy the `main` branch. Railway uses the root `Dockerfile` and the `railway.json` health-check configuration.
-2. Add a Railway volume to the service and set its mount path to `/data`. The app stores its SQLite database, face samples, and recognition model in `ATTENDLY_DATA_DIR` (`/data` in the container).
-3. In the service's networking settings, generate a public domain. Railway provides an HTTPS URL that can be shared with other people.
-4. Open the generated URL, allow camera access, and use test identities only. The public app has no sign-in, so anyone with the URL can use it and view its attendance data.
+1. Push this repository, including `render.yaml`, to GitHub. In Render, choose **New → Blueprint**, connect this repository, and apply the `render.yaml` configuration.
+2. Wait for the Docker build and `/health` check to pass. Render assigns the web service a public HTTPS URL that can be shared with other people.
+3. Open the generated URL, allow camera access, and use test identities only. The public app has no sign-in, so anyone with the URL can use it and view its attendance data.
 
-The container listens on Railway's injected `PORT`. Creating the Railway project, volume, and public domain requires access to a Railway account; this repository cannot create or supply a deployment URL by itself. Without a mounted volume, local files may be lost when Railway replaces the container.
+This Blueprint uses Render's free plan and intentionally does not configure a persistent disk. The database, face samples, and model are stored in the container's ephemeral `/data` directory and may be lost when the service restarts or redeploys. The app reads Render's injected `PORT`. A persistent disk requires a paid Render web service.
 
 ## Using the dashboard
 
@@ -128,7 +127,8 @@ Report dates are inclusive, and ranges are limited to 366 days. Omitting both re
 ├── backend/
 │   ├── app.py              # Flask app, API, database, and face recognition
 │   └── requirements.txt    # Python dependencies
-├── Dockerfile              # Railway container build and production server
+├── Dockerfile              # Container build and production server
+├── render.yaml             # Render Blueprint for the free public demo
 ├── tests/
 │   └── test_reports.py     # Report and CSV export tests
 ├── app.js                  # Dashboard behavior and API requests
