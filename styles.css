@@ -209,7 +209,7 @@ h1 {
 }
 .wave { color: var(--accent); font-size: 20px; vertical-align: 2px; }
 .page-subtitle, .section-subtitle { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
-.demo-notice { color: var(--amber); font-size: 11px; margin: 9px 0 0; }
+.site-notice { color: var(--amber); font-size: 11px; margin: 9px 0 0; }
 .heading-link { color: var(--accent); font-size: 12px; font-weight: 700; padding-bottom: 2px; white-space: nowrap; }
 .heading-link span { font-size: 15px; margin-left: 5px; }
 

@@ -2,7 +2,7 @@
 
 [View the GitHub repository](https://github.com/Mohitverse21/3rd-semester-mini-project)
 
-**Live demo:** [Open Attendly](https://attendly-4vj9.onrender.com)
+**Live website:** [Open Attendly](https://attendly-4vj9.onrender.com)
 
 Attendly is a local, browser-based attendance dashboard for a classroom. It uses a webcam to enroll students and mark attendance by face, with records organized by subject and stored in a local SQLite database.
 
@@ -70,7 +70,7 @@ On first start, the application initializes its SQLite database and face-sample 
 
 Run the report tests from the project root with `python -m unittest discover -s tests -v`.
 
-## Deploy a public demo on Render
+## Deploy a public website on Render
 
 The app is not designed for real student data on a public URL: it has no authentication, and face images and attendance records are sensitive. Use this deployment only with test data.
 
@@ -130,7 +130,7 @@ Report dates are inclusive, and ranges are limited to 366 days. Omitting both re
 │   ├── app.py              # Flask app, API, database, and face recognition
 │   └── requirements.txt    # Python dependencies
 ├── Dockerfile              # Container build and production server
-├── render.yaml             # Render Blueprint for the free public demo
+├── render.yaml             # Render Blueprint for the free public website
 ├── tests/
 │   └── test_reports.py     # Report and CSV export tests
 ├── app.js                  # Dashboard behavior and API requests
