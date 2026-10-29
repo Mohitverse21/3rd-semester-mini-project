@@ -2,6 +2,8 @@
 
 [View the GitHub repository](https://github.com/Mohitverse21/3rd-semester-mini-project)
 
+**Live demo:** [Open Attendly](https://attendly-4vj9.onrender.com)
+
 Attendly is a local, browser-based attendance dashboard for a classroom. It uses a webcam to enroll students and mark attendance by face, with records organized by subject and stored in a local SQLite database.
 
 > **Project status:** Educational/miniproject prototype. Face recognition is probabilistic and should not be used as the sole basis for consequential attendance decisions.
@@ -76,7 +78,7 @@ The app is not designed for real student data on a public URL: it has no authent
 2. Wait for the Docker build and `/health` check to pass. Render assigns the web service a public HTTPS URL that can be shared with other people.
 3. Open the generated URL, allow camera access, and use test identities only. The public app has no sign-in, so anyone with the URL can use it and view its attendance data.
 
-This Blueprint uses Render's free plan and intentionally does not configure a persistent disk. The database, face samples, and model are stored in the container's ephemeral `/data` directory and may be lost when the service restarts or redeploys. The app reads Render's injected `PORT`. A persistent disk requires a paid Render web service.
+This Blueprint uses Render's free plan and intentionally does not configure a persistent disk. The database, face samples, and model are stored in the container's ephemeral `/data` directory and may be lost when the service restarts or redeploys. The free instance also spins down during inactivity, so its first request afterward may take 50 seconds or more. The app reads Render's injected `PORT`. A persistent disk requires a paid Render web service.
 
 ## Using the dashboard
 
